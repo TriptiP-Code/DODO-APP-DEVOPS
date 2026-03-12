@@ -1,453 +1,404 @@
-1️⃣ What you have already built (in detail)
-2️⃣ What a complete DevOps pipeline would add next
+0️⃣ What You Already Completed (Important)
 
-1️⃣ What You Have Built Till Now
+Your current system:
 
-Your project is a multi-container application running with Docker Compose.
+React Frontend
+      │
+      ▼
+Nginx Reverse Proxy
+      │
+      ▼
+Node.js Backend
+      │
+      ▼
+PostgreSQL
 
-Architecture:
+Running with:
 
-Browser
-   │
-   ▼
-Nginx (Reverse Proxy)
-   │
-   ├── Frontend (React + Vite)
-   │
-   └── Backend (Node.js / Express)
-            │
-            ▼
-         PostgreSQL
+Docker
 
-Let's break down each stage.
+Docker Compose
 
-Stage 1 — Application Architecture
+Reverse Proxy
 
-You created 3 application layers.
+Health check endpoint
 
-Frontend
+Multi-container networking
 
-Location:
+So Task 1 is already 40% complete because you already built the microservices.
 
-frontend/
+Now we just move them into Kubernetes.
 
-Tech:
+🧭 COMPLETE IMPLEMENTATION PLAN (FREE TOOLS ONLY)
 
-React
+Tools we will use:
 
-Vite
+Purpose	Tool	Free?
+Kubernetes cluster	Kind or Minikube	Free
+CI/CD	GitHub Actions	Free
+Container registry	DockerHub	Free
+Monitoring	Prometheus + Grafana	Free
+Logging	Loki + Grafana	Free
+Tracing	Jaeger	Free
+Security scanning	Trivy	Free
+GitOps	ArgoCD	Free
+Secrets	Sealed Secrets	Free
 
-Purpose:
+Everything can run locally or free tier.
 
-UI
+TASK 1 — Kubernetes Deployment
 
-Calls backend API
+Goal from assignment:
 
-Example request:
+Deploy frontend, backend, database in Kubernetes.
 
-/api/health
-Backend
+We will convert Docker Compose → Kubernetes manifests.
 
-Location:
+Step 1 — Install Kubernetes (FREE)
 
-backend/
+Use Kind (Kubernetes in Docker)
 
-Tech:
+Install:
 
-Node.js
+https://kind.sigs.k8s.io/
 
-Express
+Install kubectl:
 
-Purpose:
+https://kubernetes.io/docs/tasks/tools/
+Create Cluster
+kind create cluster --name dodo-cluster
 
-Business logic
+Check:
 
-API endpoints
+kubectl get nodes
+Step 2 — Push Your Images to DockerHub
 
-Communicate with database
+Create free account:
 
-Example endpoint:
+https://hub.docker.com
 
-GET /health
+Login:
 
-Returns:
+docker login
 
-{"status":"OK"}
-Database
+Tag images:
 
-Image used:
+docker tag dodo-app-devops-frontend tripti/dodo-frontend:v1
+docker tag dodo-app-devops-backend tripti/dodo-backend:v1
 
-postgres:15
+Push:
 
-Purpose:
+docker push tripti/dodo-frontend:v1
+docker push tripti/dodo-backend:v1
 
-Store data for the backend.
+Now Kubernetes can pull them.
 
-Right now it is only running, but later it will store:
+Step 3 — Create Kubernetes Project Structure
 
-users
+Inside your repo:
 
-tasks
+dodo-app-devops
+│
+├── k8s
+│   ├── frontend
+│   ├── backend
+│   ├── database
+│   ├── ingress
+│   └── namespace.yaml
+Step 4 — Create Namespace
 
-orders
+k8s/namespace.yaml
 
-etc.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dodo
 
-Stage 2 — Containerization (Docker)
+Apply:
 
-You containerized each service.
+kubectl apply -f namespace.yaml
+Step 5 — Deploy PostgreSQL
 
-Meaning:
+k8s/database/postgres-deployment.yaml
 
-Each component runs inside a Docker container.
+This satisfies:
 
-Containers created:
+✔ Deployment
+✔ Service
+✔ Persistent storage (bonus)
 
-frontend container
-backend container
-postgres container
-nginx container
+Step 6 — Deploy Backend
 
-You wrote Dockerfiles.
+k8s/backend/deployment.yaml
+
+Includes:
+
+✔ Deployment
+✔ Service
+✔ ConfigMap
+✔ Secrets
+✔ health checks
+
+Example readiness probe:
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 5000
+  initialDelaySeconds: 5
+Step 7 — Deploy Frontend
+
+Frontend deployment:
+
+tripti/dodo-frontend:v1
+
+Expose using service.
+
+Step 8 — Ingress Controller
+
+Install nginx ingress:
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+Create:
+
+k8s/ingress.yaml
 
 Example:
 
-frontend/Dockerfile
-backend/Dockerfile
+/ → frontend
+/api → backend
+Step 9 — Horizontal Pod Autoscaler
 
-Purpose of Dockerfile:
+Assignment requirement.
 
-Code → Image → Container
+Example:
 
-Flow:
+kubectl autoscale deployment backend \
+  --cpu-percent=50 \
+  --min=2 \
+  --max=5
 
-Source Code
-     ↓
-Docker Build
-     ↓
-Docker Image
-     ↓
-Docker Container
-Stage 3 — Docker Compose
+This automatically scales backend pods.
 
-You created:
+Step 10 — Resource Limits
 
-docker-compose.yml
+Example:
 
-Purpose:
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
 
-Run multiple containers together.
+Assignment requirement.
 
-Instead of running:
+TASK 2 — CI/CD Pipeline
 
-docker run frontend
-docker run backend
-docker run postgres
-docker run nginx
+Use GitHub Actions (FREE).
 
-You run one command:
+Folder:
 
-docker compose up --build
+.github/workflows
 
-Compose automatically:
+Create:
 
-builds images
+ci.yml
 
-creates containers
+Pipeline stages:
 
-creates network
-
-connects services
-
-Stage 4 — Docker Networking
-
-Docker Compose automatically created a private network.
-
-Containers communicate using service names:
-
-backend
-frontend
-db
-nginx
-
-Example communication:
-
-Backend → Database
-
-postgres://db:5432
-
-Frontend → Backend
-
-http://backend:5000
-
-But this only works inside Docker.
-
-Stage 5 — Reverse Proxy (Nginx)
-
-This is a real DevOps concept.
-
-You added:
-
-nginx container
-
-Purpose:
-
-Route requests.
-
-Without nginx:
-
-localhost:3000 → frontend
-localhost:5000 → backend
-
-With nginx:
-
-localhost → frontend
-localhost/api → backend
-
-So users only see one entry point.
-
-Example routing:
-
-location /
-→ frontend
-
-location /api
-→ backend
-Stage 6 — API Gateway Style Routing
-
-You implemented this:
-
-Frontend request:
-
-/api/health
-
-Nginx rewrite:
-
-/health
-
-Forwarded to:
-
-backend:5000
-
-This is exactly how production systems work.
-
-Stage 7 — Health Check API
-
-Backend created endpoint:
-
-GET /health
-
-Returns:
-
-{"status":"OK"}
-
-Frontend uses it to check connectivity.
-
-UI shows:
-
-Backend Status: OK
-
-This confirms:
-
-Frontend → Nginx → Backend → Response
-
-Working perfectly.
-
-Stage 8 — Full Container Stack Running
-
-Your running containers:
-
-nginx
-frontend
-backend
-postgres
-
-You verified using:
-
-docker ps
-
-And logs using:
-
-docker logs
-
-These are real DevOps debugging skills.
-
-What You Have Achieved (Major Concepts)
-
-You implemented:
-
-✅ Docker
-✅ Dockerfile
-✅ Docker Compose
-✅ Multi-container architecture
-✅ Container networking
-✅ Reverse proxy (Nginx)
-✅ API routing
-✅ Health check endpoint
-✅ Debugging containers
-
-This is already a solid DevOps foundation.
-
-2️⃣ What Is Still Left (Complete DevOps Roadmap)
-
-Your project is currently local development infrastructure.
-
-To make it real DevOps production project, these steps remain.
-
-Stage 9 — CI Pipeline (Continuous Integration)
-
-Using GitHub Actions.
-
-Pipeline should:
-
-Push code to GitHub
-       ↓
-GitHub Actions triggered
-       ↓
+Push code
+   ↓
+Lint
+   ↓
 Build Docker Images
-       ↓
-Run tests
-       ↓
-Push images to DockerHub
+   ↓
+Push to DockerHub
+   ↓
+Deploy to Kubernetes
 
-Tools:
+Example triggers:
 
-GitHub Actions
+on:
+  push:
+    branches: [main]
+Add Container Security Scan
 
-DockerHub
+Use Trivy (free).
 
-Stage 10 — Container Registry
+Example step:
 
-Store images in:
+trivy image tripti/dodo-backend:v1
+GitOps Deployment (Assignment Requirement)
 
-Example:
+Install ArgoCD
 
-DockerHub
+kubectl create namespace argocd
 
-AWS ECR
+Install:
 
-Example images:
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-tripti/frontend
-tripti/backend
-tripti/nginx
-Stage 11 — Cloud Deployment
+ArgoCD will deploy your manifests automatically.
 
-Deploy containers on cloud.
+TASK 3 — Monitoring & Observability
 
-Options:
+Install Prometheus + Grafana
 
-AWS EC2
+Free.
 
-AWS ECS
+Install Helm:
 
-Kubernetes
+https://helm.sh
 
-DigitalOcean
+Install monitoring stack:
 
-Example flow:
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 
-GitHub → DockerHub → EC2 Server
+Install:
 
-Server runs:
+helm install monitoring prometheus-community/kube-prometheus-stack
 
-docker compose up
+You now get:
 
-Your app becomes public:
+✔ Prometheus
+✔ Grafana
+✔ AlertManager
 
-http://your-ip
-Stage 12 — Monitoring
+Logging (Free)
 
-Add monitoring tools.
+Use Loki + Grafana
 
-Industry standard:
+Install:
 
-Prometheus
+helm install loki grafana/loki-stack
 
-Collect metrics.
+Now logs from all containers go to Grafana.
 
-Grafana
+Distributed Tracing
 
-Visualize metrics.
+Install Jaeger
 
-Example dashboard:
+kubectl create namespace observability
 
-CPU
+Deploy Jaeger operator.
 
-Memory
+Now you get request tracing.
 
-Container health
+TASK 4 — Security Hardening
 
-API latency
+Required in assignment.
 
-Stage 13 — Logging
+RBAC
 
-Centralized logs.
+Create roles:
 
-Tools:
-
-ELK Stack
-
-Loki
-
-Grafana logs
+developer
+operator
+admin
 
 Example:
 
-frontend logs
-backend logs
-nginx logs
+Role
+RoleBinding
+ClusterRole
+Pod Security
 
-All visible in dashboard.
+Prevent dangerous containers:
 
-Stage 14 — Infrastructure as Code
+privileged: false
+readOnlyRootFilesystem: true
+Network Policies
 
-Instead of manually creating servers.
+Restrict communication.
+
+Example:
+
+frontend → backend allowed
+backend → database allowed
+everything else blocked
+Container Scanning
 
 Use:
 
-Terraform
+Trivy
 
-AWS CloudFormation
+Already added in CI pipeline.
 
-Example:
+Secrets Management
 
-terraform apply
+Use Sealed Secrets (free).
 
-Creates:
+This encrypts Kubernetes secrets.
 
-EC2
+Install:
 
-Security groups
+kubectl apply -f sealed-secrets-controller.yaml
+TASK 5 — Istio (Knowledge Only)
 
-Load balancer
+No implementation needed.
 
-Stage 15 — Kubernetes (Advanced)
+You just write answers explaining:
 
-Instead of Docker Compose.
+sidecar proxy
 
-Use:
+mTLS
 
-Kubernetes
+traffic routing
 
-For:
+observability integration
 
-scaling
+This goes in:
 
-auto-healing
+docs/istio.md
+Final Repository Structure
 
-rolling updates
+Your GitHub repo should look like this:
 
-Your Current Level
+dodo-devops-project
+│
+├── frontend
+├── backend
+├── nginx
+│
+├── k8s
+│   ├── frontend
+│   ├── backend
+│   ├── database
+│   ├── ingress
+│
+├── monitoring
+│
+├── security
+│
+├── .github
+│   └── workflows
+│        └── ci.yml
+│
+└── README.md
+What Interviewers Will Love
 
-Right now you are at:
+You will demonstrate:
 
-DevOps Level 1 → Containerized Application
+✔ Kubernetes
+✔ CI/CD
+✔ GitOps
+✔ Monitoring
+✔ Logging
+✔ Security
+✔ Autoscaling
 
-Next level:
+This is a full DevOps platform.
 
-DevOps Level 2 → CI/CD + Cloud Deployment
+Honest Advice
 
-Final level:
+The best strategy for this assignment is:
 
-DevOps Level 3 → Kubernetes + Monitoring
+1️⃣ Kubernetes deployment
+2️⃣ GitHub Actions pipeline
+3️⃣ Prometheus + Grafana monitoring
+4️⃣ Trivy security scanning
+
+These 4 alone already make a strong submission.
